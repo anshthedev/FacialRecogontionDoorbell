@@ -1,32 +1,27 @@
-#!/usr/bin/env python3
-
-
-from ev3dev2.sensor.lego import VisionSensor
-import socket
+from ev3dev2.sensor import INPUT_1
+from flask import Flask, Response
 import cv2
-import numpy as np
 
-# Create a VisionSensor object for the Logitech camera
-camera = VisionSensor()
-camera.mode = 'GRB'
+app = Flask(__name__)
 
-# Configure socket connection
-server_address = ('192.168.86.37', 12345)  # Replace with your computer's IP address
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect(server_address)
+# Connect the webcam to the EV3
+cap = cv2.VideoCapture(0)  # Use 0 for the default camera
 
-try:
+def generate_frames():
     while True:
-        # Capture an image from the camera
-        img = camera.image
-        img_array = np.array(img)
+        success, frame = cap.read()
+        if not success:
+            break
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if not ret:
+            break
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
-        # Encode the image as a JPEG
-        _, img_encoded = cv2.imencode('.jpg', img_array)
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-        # Send the encoded image to the computer
-        data = img_encoded.tobytes()
-        sock.sendall(data)
-
-finally:
-    sock.close()
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000, debug=True)
