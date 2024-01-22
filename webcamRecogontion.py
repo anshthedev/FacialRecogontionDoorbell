@@ -4,6 +4,36 @@ import cv2
 import numpy as np
 import math
 
+import usb.core
+import usb.util
+
+def send_signal():
+    # VENDOR_ID = 0x0694  # Replace with your actual Vendor ID
+    # PRODUCT_ID = 0x0005  # Replace with your actual product ID
+
+    # Find the USB device
+    dev = usb.core.find(idVendor=0x0694, idProduct=0x0005)
+
+
+    if dev is None:
+        raise ValueError("Device not found")
+
+    try:
+        # Detach the kernel driver from the device
+        if dev.is_kernel_driver_active(0):
+            dev.detach_kernel_driver(0)
+
+        # Set the configuration
+        dev.set_configuration()
+
+        # Send data
+        data = b"Face detected!"
+        dev.write(0x02, data, 1000)  # Endpoint 0x02, data, timeout 1000ms
+
+    finally:
+        # Release the device
+        usb.util.release_interface(dev, 0)
+
 # Accuracy Calculator
 def face_confidence(face_distance, face_match_threshold=0.6):
     range = (1.0 - face_match_threshold)
@@ -89,6 +119,10 @@ class FaceRecognition:
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                 cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
                 cv2.putText(frame, name, (left + 6, bottom - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1)
+                
+                if(name != "Unknown"):
+                    send_signal()
+                    
 
             # Display the resulting image
             cv2.imshow('Face Recognition', frame)
